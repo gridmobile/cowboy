@@ -66,51 +66,44 @@ upgrade(Req, Env, Handler, HandlerOpts) ->
 	try websocket_upgrade(State, Req) of
 		{ok, State2, Req2} ->
 			handler_init(State2, Req2, HandlerOpts)
-	catch _:_ ->
-		receive
-			{cowboy_req, resp_sent} -> ok
-		after 0 ->
-			_ = cowboy_req:reply(400, Req),
-			exit(normal)
-		end
+
+	catch Class:Reason ->
+		Stacktrace = erlang:get_stacktrace(),
+		cowboy_req:maybe_reply(Stacktrace, Req),
+		erlang:Class([
+			{reason, Reason},
+			{mfa, {Handler, init, 3}},
+			{stacktrace, Stacktrace},
+			{req, cowboy_req:to_list(Req)},
+			{opts, HandlerOpts}
+		])
 	end.
+
+%			
+%	catch _:_ ->
+%		receive
+%			{cowboy_req, resp_sent} -> ok
+%		after 0 ->
+%			_ = cowboy_req:reply(400, Req),
+%			exit(normal)
+%		end
+%	end.
 
 -spec websocket_upgrade(#state{}, Req)
 	-> {ok, #state{}, Req} when Req::cowboy_req:req().
 websocket_upgrade(State, Req) ->
 	{ok, ConnTokens, Req2}
 		= cowboy_req:parse_header(<<"connection">>, Req),
-
-	lager:info("Connection1"),
-
 	true = lists:member(<<"upgrade">>, ConnTokens),
-
-	lager:info("Connection2"),
-
 	%% @todo Should probably send a 426 if the Upgrade header is missing.
 	{ok, [<<"websocket">>], Req3}
 		= cowboy_req:parse_header(<<"upgrade">>, Req2),
-
-	lager:info("Connection3"),
-
 	{Version, Req4} = cowboy_req:header(<<"sec-websocket-version">>, Req3),
-
-	lager:info("Connection4"),
-
 	IntVersion = list_to_integer(binary_to_list(Version)),
-
-	lager:info("Connection5"),
-
 	true = (IntVersion =:= 7) orelse (IntVersion =:= 8)
 		orelse (IntVersion =:= 13),
-
-	lager:info("Connection6"),
-
 	{Key, Req5} = cowboy_req:header(<<"sec-websocket-key">>, Req4),
 	false = Key =:= undefined,
-
-	lager:info("Connection7"),
-
 	websocket_extensions(State#state{key=Key},
 		cowboy_req:set_meta(websocket_version, IntVersion, Req5)).
 
