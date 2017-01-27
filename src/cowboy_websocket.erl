@@ -80,16 +80,37 @@ upgrade(Req, Env, Handler, HandlerOpts) ->
 websocket_upgrade(State, Req) ->
 	{ok, ConnTokens, Req2}
 		= cowboy_req:parse_header(<<"connection">>, Req),
+
+	lager:info("Connection1"),
+
 	true = lists:member(<<"upgrade">>, ConnTokens),
+
+	lager:info("Connection2"),
+
 	%% @todo Should probably send a 426 if the Upgrade header is missing.
 	{ok, [<<"websocket">>], Req3}
 		= cowboy_req:parse_header(<<"upgrade">>, Req2),
+
+	lager:info("Connection3"),
+
 	{Version, Req4} = cowboy_req:header(<<"sec-websocket-version">>, Req3),
+
+	lager:info("Connection4"),
+
 	IntVersion = list_to_integer(binary_to_list(Version)),
+
+	lager:info("Connection5"),
+
 	true = (IntVersion =:= 7) orelse (IntVersion =:= 8)
 		orelse (IntVersion =:= 13),
+
+	lager:info("Connection6"),
+
 	{Key, Req5} = cowboy_req:header(<<"sec-websocket-key">>, Req4),
 	false = Key =:= undefined,
+
+	lager:info("Connection7"),
+
 	websocket_extensions(State#state{key=Key},
 		cowboy_req:set_meta(websocket_version, IntVersion, Req5)).
 
